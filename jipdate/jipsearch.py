@@ -279,44 +279,31 @@ def create_jql(jira, initial_jql):
 
 
 def search_issues(jira, jql):
-    issues = []
-    result = {"startAt": 0, "total": 1}
-    max_results = 50
+    fields = [
+        "summary",
+        "description",
+        "created",
+        "status",
+        "issuetype",
+        "assignee",
+        "timetracking",
+    ]
 
-    while result["startAt"] < result["total"]:
-        fields = [
-            "summary",
-            "description",
-            "created",
-            "status",
-            "issuetype",
-            "assignee",
-            "timetracking",
-        ]
+    if cfg.args.format:
+        regex = r"\{(.+?)\}"
+        for keys in re.findall(regex, cfg.args.format):
+            fields.append(keys.split(":")[0])
 
-        if cfg.args.format:
-            regex = r"\{(.+?)\}"
-            for keys in re.findall(regex, cfg.args.format):
-                fields.append(keys.split(":")[0])
+    if cfg.args.parent:
+        fields.append("parent")
 
-        if cfg.args.parent:
-            fields.append("parent")
+    try:
+        issues = jira.search_issues(jql, maxResults=False, fields=fields)
+    except JIRAError as e:
+        print(f"{e.text}")
+        exit(1)
 
-        try:
-            result = jira.search_issues(
-                jql,
-                startAt=result["startAt"],
-                maxResults=max_results,
-                fields=fields,
-                json_result=True,
-            )
-        except JIRAError as e:
-            print(f"{e.text}")
-            exit(1)
-        issues += result["issues"]
-        result["startAt"] += max_results
-
-    return issues
+    return [issue.raw for issue in issues]
 
 
 def call_jqls(jira, jql):
