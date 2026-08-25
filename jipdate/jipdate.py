@@ -425,22 +425,22 @@ def parse_status_file(jira, filename, issues):
             # means that it doesn't matter if the user enter all lower case,
             # mixed or all upper case. All of them will work.
             new_status = transition.groups()[0].title()
-            (i, c, _, ts) = issue_comments[-1]
+            i, c, _, ts = issue_comments[-1]
             issue_comments[-1] = (i, c, new_status, ts)
         elif re.search(regex_timespent, line, re.IGNORECASE):
             timespent = line.split(":")[1].strip()
-            (i, c, t, _) = issue_comments[-1]
+            i, c, t, _ = issue_comments[-1]
             issue_comments[-1] = (i, c, t, timespent)
         else:
             # Don't add lines with comments
             if line[0] != "#" and issue_comments and validissue:
-                (i, c, t, ts) = issue_comments[-1]
+                i, c, t, ts = issue_comments[-1]
                 issue_comments[-1] = (i, c + line, t, ts)
 
     issue_upload = []
     print("These JIRA cards will be updated as follows:\n")
     for idx, t in enumerate(issue_comments):
-        (issue, comment, transition, timespent) = issue_comments[idx]
+        issue, comment, transition, timespent = issue_comments[idx]
 
         # Strip beginning  and trailing blank lines
         comment = comment.strip("\n")
@@ -457,7 +457,7 @@ def parse_status_file(jira, filename, issues):
                 or transition.startswith("Closed")
                 or transition.startswith("Completed")
             ) and "/" in transition:
-                (transition, resolution) = map(str.strip, transition.split("/"))
+                transition, resolution = map(str.strip, transition.split("/"))
                 if not resolution in resolution_map:
                     print(
                         'Invalid resolution "{}" for issue {}'.format(resolution, issue)
@@ -637,7 +637,7 @@ def main():
         sys.exit(os.EX_USAGE)
 
     if cfg.args.q:
-        (filename, issues) = get_jira_issues(jira, username)
+        filename, issues = get_jira_issues(jira, username)
 
         if cfg.args.p:
             print_status_file(filename)
