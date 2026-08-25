@@ -7,10 +7,10 @@ name = "jipdate"
 authors = [{name = "Joakim Bech", email = "joakim.bech@linaro.org"}]
 readme = "README.md"
 classifiers = ["License :: OSI Approved :: MIT License"]
-requires-python = ">=3.6"
+requires-python = ">=3.11"
 dependencies = [
     "jinja2",
-    "jira",
+    "jira>=3.10.4",
     "PyYAML",
     "python-dateutil",
 ]
