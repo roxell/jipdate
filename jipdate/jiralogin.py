@@ -135,7 +135,8 @@ def get_jira_instance(use_test_server):
                     url,
                     basic_auth=(username, token),
                     options={
-                        "headers": {"Accept": "application/json;1=1.0, */*;q=0.9"}
+                        "rest_api_version": "3",
+                        "headers": {"Accept": "application/json;1=1.0, */*;q=0.9"},
                     },
                 ),
                 username,
@@ -150,7 +151,8 @@ def get_jira_instance(use_test_server):
                     url,
                     basic_auth=(username, password),
                     options={
-                        "headers": {"Accept": "application/json;1=1.0, */*;q=0.9"}
+                        "rest_api_version": "3",
+                        "headers": {"Accept": "application/json;1=1.0, */*;q=0.9"},
                     },
                 ),
                 username,

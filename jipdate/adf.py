@@ -19,3 +19,13 @@ def adf_to_text(node):
     if node_type in INLINE_CONTAINERS:
         return "".join(children)
     return "\n".join(children)
+
+
+def text_to_adf(text):
+    paragraphs = []
+    for line in text.split("\n"):
+        paragraph = {"type": "paragraph"}
+        if line:
+            paragraph["content"] = [{"type": "text", "text": line}]
+        paragraphs.append(paragraph)
+    return {"type": "doc", "version": 1, "content": paragraphs}

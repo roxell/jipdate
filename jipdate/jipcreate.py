@@ -13,6 +13,7 @@ import yaml
 
 # Local files
 from jipdate import cfg
+from jipdate.adf import text_to_adf
 from jipdate import jiralogin
 from jipdate import __version__
 
@@ -186,7 +187,7 @@ def main():
                     fields["summary"] = issue["Summary"]
 
                 if "Description" in issue.keys():
-                    fields["description"] = issue["Description"]
+                    fields["description"] = text_to_adf(issue["Description"])
 
                 if "OriginalEstimate" in issue.keys():
                     fields["timetracking"] = {

@@ -13,7 +13,7 @@ import yaml
 
 # Local files
 from jipdate import cfg
-from jipdate.adf import adf_to_text
+from jipdate.adf import adf_to_text, text_to_adf
 from jipdate import jiralogin
 from jipdate import __version__
 
@@ -227,9 +227,9 @@ def update_jira(jira, i, c, t, ts=None):
         log.debug(
             "-- >8 --------------------------------------------------------------------------\n\n"
         )
-        jira.add_comment(i, c)
+        jira.add_comment(i, text_to_adf(c))
         if ts:
-            jira.add_worklog(i, timeSpent=ts, comment=c)
+            jira.add_worklog(i, timeSpent=ts, comment=text_to_adf(c))
 
 
 def write_last_jira_comment(f, jira, issue):
