@@ -377,6 +377,7 @@ def parse_status_file(jira, filename, issues):
 
     myissue = ""
     mycomment = ""
+    validissue = False
 
     # build list of {issue,comment} tuples found in status
     issue_comments = []
@@ -426,7 +427,7 @@ def parse_status_file(jira, filename, issues):
             new_status = transition.groups()[0].title()
             i, c, _, ts = issue_comments[-1]
             issue_comments[-1] = (i, c, new_status, ts)
-        elif re.search(regex_timespent, line, re.IGNORECASE):
+        elif re.search(regex_timespent, line, re.IGNORECASE) and validissue:
             timespent = line.split(":")[1].strip()
             i, c, t, _ = issue_comments[-1]
             issue_comments[-1] = (i, c, t, timespent)
