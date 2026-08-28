@@ -15,6 +15,7 @@ import yaml
 
 # Local files
 from jipdate import cfg
+from jipdate.adf import adf_to_text
 from jipdate import jiralogin
 from jipdate import __version__
 
@@ -95,7 +96,7 @@ def enumerate_updates(jira):
             if when.replace(tzinfo=None) < since:
                 continue
 
-            status["comments"].append(comment.body)
+            status["comments"].append(adf_to_text(comment.raw["body"]))
 
         for history in changelog.histories:
             when = datetime.datetime.strptime(history.created, "%Y-%m-%dT%H:%M:%S.%f%z")

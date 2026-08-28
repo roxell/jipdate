@@ -10,6 +10,7 @@ from jira import JIRAError
 
 # Local files
 from jipdate import cfg
+from jipdate.adf import adf_to_text
 from jipdate import jiralogin
 from jipdate import __version__
 
@@ -354,7 +355,7 @@ def print_issues(jira, issues):
             print(f"# Description:")
             descriptions = issue["fields"]["description"]
             if descriptions:
-                for line in descriptions.split("\n"):
+                for line in adf_to_text(descriptions).split("\n"):
                     print(f"#   {line}")
                 print(f"#\n")
 
@@ -376,7 +377,7 @@ def print_issues(jira, issues):
                 )
                 print(f"# Last comment, updated: {c[0].updated}, by: {c[0].author}")
                 comment = "# ---8<---\n# %s\n# --->8---\n" % "\n# ".join(
-                    c[-1].body.splitlines()
+                    adf_to_text(c[-1].raw["body"]).splitlines()
                 )
                 print(comment)
 

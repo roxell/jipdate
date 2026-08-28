@@ -13,6 +13,7 @@ import yaml
 
 # Local files
 from jipdate import cfg
+from jipdate.adf import adf_to_text
 from jipdate import jiralogin
 from jipdate import __version__
 
@@ -239,7 +240,7 @@ def write_last_jira_comment(f, jira, issue):
     if len(c) > 0:
         try:
             comment = "# Last comment:\n# ---8<---\n# %s\n# --->8---\n" % "\n# ".join(
-                c[-1].body.splitlines()
+                adf_to_text(c[-1].raw["body"]).splitlines()
             )
             f.write(comment)
         except UnicodeEncodeError:
