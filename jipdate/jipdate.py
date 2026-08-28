@@ -277,9 +277,7 @@ def get_jira_issues(jira, username):
     jql = "%s AND assignee = %s AND %s" % (issue_type, user, status)
     log.debug(jql)
 
-    my_issues = jira.search_issues(jql)
-    if my_issues.total > my_issues.maxResults:
-        my_issues = jira.search_issues(jql, maxResults=my_issues.total)
+    my_issues = jira.search_issues(jql, maxResults=False)
 
     showdate = strftime("%Y-%m-%d", gmtime())
     subject = "Subject: [Weekly] Week ending " + showdate + "\n\n"

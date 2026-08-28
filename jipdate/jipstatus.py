@@ -63,15 +63,11 @@ def enumerate_updates(jira):
     log.debug(jql)
 
     my_issues = jira.search_issues(
-        jql, expand="changelog", fields="summary,comment,components,assignee,created"
+        jql,
+        expand="changelog",
+        fields="summary,comment,components,assignee,created",
+        maxResults=False,
     )
-    if my_issues.total > my_issues.maxResults:
-        my_issues = jira.search_issues(
-            jql,
-            expand="changelog",
-            fields="summary,comment,components,assignee,created",
-            maxResults=my_issues.total,
-        )
 
     for issue in my_issues:
         changelog = issue.changelog
@@ -123,15 +119,11 @@ def enumerate_pending(jira):
     log.debug(jql)
 
     my_issues = jira.search_issues(
-        jql, expand="changelog", fields="summary,assignee,created,components"
+        jql,
+        expand="changelog",
+        fields="summary,assignee,created,components",
+        maxResults=False,
     )
-    if my_issues.total > my_issues.maxResults:
-        my_issues = jira.search_issues(
-            jql,
-            expand="changelog",
-            fields="summary,assignee,created,components",
-            maxResults=my_issues.total,
-        )
 
     for issue in my_issues:
         status = {}
