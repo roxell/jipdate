@@ -375,7 +375,7 @@ def print_issues(jira, issues):
                 print(
                     f"# Assignee: {issue['fields']['assignee']['displayName']}, Original Estimate: {originalestimate}, Time Spent: {timespent}"
                 )
-                print(f"# Last comment, updated: {c[0].updated}, by: {c[0].author}")
+                print(f"# Last comment, updated: {c[-1].updated}, by: {c[-1].author}")
                 comment = "# ---8<---\n# %s\n# --->8---\n" % "\n# ".join(
                     adf_to_text(c[-1].raw["body"]).splitlines()
                 )
