@@ -10,6 +10,7 @@ import re
 import sys
 import tempfile
 import yaml
+from jira import JIRAError
 
 # Local files
 from jipdate import cfg
@@ -406,10 +407,9 @@ def parse_status_file(jira, filename, issues):
                 try:
                     issue = jira.issue(myissue)
                     issue_comments.append((issue, "", "", None))
-                except Exception as e:
-                    if "Issue Does Not Exist" in e.text:
-                        print("[{}] :  {}".format(myissue, e.text))
-                        validissue = False
+                except JIRAError as e:
+                    print("[{}] :  {}".format(myissue, e.text))
+                    validissue = False
 
         # Stop parsing entirely.  This needs to be placed before regex_stop
         # or the .* will match and [FIN] won't be processed
