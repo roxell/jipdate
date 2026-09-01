@@ -372,8 +372,11 @@ def print_issues(jira, issues):
                     ]
                 except KeyError:
                     originalestimate = "Not Set"
+                assignee = "Unassigned"
+                if issue["fields"]["assignee"]:
+                    assignee = issue["fields"]["assignee"]["displayName"]
                 print(
-                    f"# Assignee: {issue['fields']['assignee']['displayName']}, Original Estimate: {originalestimate}, Time Spent: {timespent}"
+                    f"# Assignee: {assignee}, Original Estimate: {originalestimate}, Time Spent: {timespent}"
                 )
                 print(f"# Last comment, updated: {c[-1].updated}, by: {c[-1].author}")
                 comment = "# ---8<---\n# %s\n# --->8---\n" % "\n# ".join(
