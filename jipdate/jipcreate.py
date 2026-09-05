@@ -75,6 +75,7 @@ def parse_issue_file(new_issue_file):
     """Reads new issue file and parse it into a python object"""
 
     if not os.path.isfile(new_issue_file):
+        log.error("Issue file not found: %s" % new_issue_file)
         sys.exit(-1)
 
     log.debug("Using issue file: %s" % new_issue_file)
