@@ -327,7 +327,7 @@ def print_issues(jira, issues):
                 for k in keys.split(":"):
                     if len(keys.split(":")) == 1 and "key" == k:
                         tmp_output = issue["key"]
-                    elif k in tmp_output:
+                    elif isinstance(tmp_output, dict) and k in tmp_output:
                         tmp_output = tmp_output[k]
                     else:
                         tmp_output = "None"
