@@ -88,7 +88,8 @@ def get_parser():
         default=None,
         help="""Search for issues created after this date and time.
             Valid formats include: "yyyy/MM/dd HH:mm", "yyyy-MM-dd HH:mm",
-            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".""",
+            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".
+            A period that starts with "-" needs "=", e.g. --created-after=-5d.""",
     )
 
     parser.add_argument(
@@ -99,7 +100,8 @@ def get_parser():
         default=None,
         help="""Search for issues created before this date and time.
             Valid formats include: "yyyy/MM/dd HH:mm", "yyyy-MM-dd HH:mm",
-            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".""",
+            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".
+            A period that starts with "-" needs "=", e.g. --created-before=-5d.""",
     )
 
     parser.add_argument(
@@ -110,7 +112,8 @@ def get_parser():
         default=None,
         help="""Search for issues updated after this date and time.
             Valid formats include: "yyyy/MM/dd HH:mm", "yyyy-MM-dd HH:mm",
-            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".""",
+            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".
+            A period that starts with "-" needs "=", e.g. --updated-after=-5d.""",
     )
 
     parser.add_argument(
@@ -121,7 +124,8 @@ def get_parser():
         default=None,
         help="""Search for issues updated before this date and time.
             Valid formats include: "yyyy/MM/dd HH:mm", "yyyy-MM-dd HH:mm",
-            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".""",
+            "yyyy/MM/dd", "yyyy-MM-dd", or a period format e.g. "-5d", "4w 2d".
+            A period that starts with "-" needs "=", e.g. --updated-before=-5d.""",
     )
 
     parser.add_argument(
