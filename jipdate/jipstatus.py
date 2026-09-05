@@ -278,7 +278,7 @@ output_html = """
         {%- if loop.index == 1 %}
             <ul>
         {%- endif %}
-                <li>{{'<br>'.join(c.splitlines())}}</li>
+                <li>{{c.splitlines()|join('<br>'|safe)}}</li>
         {%- if loop.index == loop.length %}
             </ul>
         {%- endif %}
@@ -346,7 +346,7 @@ def main():
 
     if cfg.args.html:
         f = open(cfg.args.html, "w")
-        template = Template(output_html)
+        template = Template(output_html, autoescape=True)
         f.write(
             template.render(
                 assignees=assignees,
