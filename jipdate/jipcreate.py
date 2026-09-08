@@ -266,10 +266,13 @@ def main():
                 if "Share Visibility" in issue.keys():
                     share_visibility = []
                     for shared_with in issue["Share Visibility"]:
-                        tmp_share = jira.search_assignable_users_for_issues(
+                        users = jira.search_assignable_users_for_issues(
                             query=shared_with, project=issue["Project"]
-                        )[0]
-                        share_visibility.append({"id": tmp_share.accountId})
+                        )
+                        if not users:
+                            print(f"Share Visibility: user {shared_with} not found")
+                            continue
+                        share_visibility.append({"id": users[0].accountId})
                     log.debug(f"shared with: {issue['Share Visibility']}")
                     log.debug(f"share_visibility: {share_visibility}")
                     # We assume that the first entry in the returned user array is the one we want
