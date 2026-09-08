@@ -301,7 +301,7 @@ def main():
                     ):
                         if field not in fields.keys():
                             print(
-                                f"Field {jira_field_to_yaml[field]} required but not set."
+                                f"Field {jira_field_to_yaml.get(field, field)} required but not set."
                             )
                             sys.exit(os.EX_USAGE)
 
