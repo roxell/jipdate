@@ -164,7 +164,7 @@ def initiate_config():
 
     log.debug("Using config file: %s" % config_file)
     with open(config_file, "r") as yml:
-        yml_config = yaml.load(yml, Loader=yaml.FullLoader)
+        yml_config = yaml.load(yml, Loader=yaml.FullLoader) or {}
 
     validation_errors = validate_yaml_structure(yml_config)
     if validation_errors:
