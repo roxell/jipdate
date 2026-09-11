@@ -161,7 +161,7 @@ def get_jira_instance(use_test_server):
         log.error(_get_auth_error_message(getattr(e, "doc", ""), url))
         sys.exit(os.EX_NOPERM)
     except JIRAError as e:
-        if "CAPTCHA_CHALLENGE" in e.text:
+        if e.text and "CAPTCHA_CHALLENGE" in e.text:
             log.error(_get_auth_error_message("captcha", url))
             sys.exit(os.EX_NOPERM)
         else:
