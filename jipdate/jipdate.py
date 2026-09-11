@@ -625,8 +625,6 @@ def main():
         parser.print_help()
         sys.exit(os.EX_USAGE)
 
-    jira, username = jiralogin.get_jira_instance(cfg.args.t)
-
     if cfg.args.x or cfg.args.e:
         if not cfg.args.q:
             log.error("Arguments '-x' and '-e' can only be used together with '-q'")
@@ -635,6 +633,8 @@ def main():
     if cfg.args.p and not cfg.args.q:
         log.error("Arguments '-p' can only be used together with '-q'")
         sys.exit(os.EX_USAGE)
+
+    jira, username = jiralogin.get_jira_instance(cfg.args.t)
 
     if cfg.args.q:
         filename, issues = get_jira_issues(jira, username)
