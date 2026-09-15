@@ -222,6 +222,10 @@ def initialize_logger(args):
     )
 
 
+def split_names(text):
+    return [name.strip() for name in text.split(",") if name.strip()]
+
+
 def create_jql(jira, initial_jql):
     jql_parts = []
     if initial_jql and initial_jql != "":
@@ -241,8 +245,7 @@ def create_jql(jira, initial_jql):
 
     if cfg.args.reporter:
         reporter_ids = []
-        reporters = cfg.args.reporter.split(",")
-        for r in reporters:
+        for r in split_names(cfg.args.reporter):
             reporter_ids += jira.search_users(query=r)
         if len(reporter_ids) > 0:
             account_ids = []
