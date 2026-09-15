@@ -315,6 +315,9 @@ def call_jqls(jira, jql):
     issues = []
     for j in jql:
         jql_str = create_jql(jira, j)
+        if not jql_str:
+            log.error("No search option given, use -j or a search option")
+            sys.exit(os.EX_USAGE)
         issues += search_issues(jira, jql_str)
     return issues
 
