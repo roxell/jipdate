@@ -68,7 +68,8 @@ def get_parser():
         required=False,
         action="append",
         default=None,
-        help="""Search for issues with the specified assignees.""",
+        help="""Search for issues with the specified assignees.
+            Use comma to separate multiple assignees.""",
     )
 
     parser.add_argument(
@@ -255,8 +256,9 @@ def create_jql(jira, initial_jql):
 
     if cfg.args.assignee:
         assignee_ids = []
-        for r in cfg.args.assignee:
-            assignee_ids += jira.search_users(query=r)
+        for arg in cfg.args.assignee:
+            for r in split_names(arg):
+                assignee_ids += jira.search_users(query=r)
         if len(assignee_ids) > 0:
             account_ids = []
             for ai in assignee_ids:
