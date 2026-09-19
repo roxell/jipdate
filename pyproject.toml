@@ -16,6 +16,9 @@ dependencies = [
 ]
 dynamic = ["version", "description"]
 
+[project.optional-dependencies]
+test = ["pytest"]
+
 [project.urls]
 Documentation = "https://jipdate.readthedocs.io/en/latest/"
 
@@ -25,3 +28,6 @@ jipdate="jipdate.jipdate:main"
 jipfp="jipdate.jipfp:main"
 jipsearch="jipdate.jipsearch:main"
 jipstatus="jipdate.jipstatus:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
