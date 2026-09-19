@@ -193,6 +193,7 @@ def get_parser():
         "--days",
         required=False,
         action="store",
+        type=int,
         default=7,
         help="Period of the report in days",
     )
