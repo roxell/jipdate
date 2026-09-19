@@ -260,7 +260,7 @@ def main():
                 if "IssueType" in issue.keys() and issue["IssueType"] == "Epic":
                     if "Epic Name" in issue.keys():
                         fields["customfield_10011"] = issue["Epic Name"]
-                    else:
+                    elif "Summary" in issue.keys():
                         fields["customfield_10011"] = issue["Summary"]
 
                 if "Share Visibility" in issue.keys():
@@ -312,7 +312,10 @@ def main():
                     print(
                         f"This issue would have been created when running without '--dry-run':"
                     )
-                    created_cards[issue["Summary"]] = f"new_issue, {issue['Summary']}"
+                    if "Summary" in issue.keys():
+                        created_cards[issue["Summary"]] = (
+                            f"new_issue, {issue['Summary']}"
+                        )
                     for field in fields.keys():
                         print(f"{field}: {fields[field]}")
                 else:
@@ -327,7 +330,8 @@ def main():
                     else:
                         # Create new card.
                         new_issue = jira.create_issue(fields=fields)
-                        created_cards[issue["Summary"]] = str(new_issue)
+                        if "Summary" in issue.keys():
+                            created_cards[issue["Summary"]] = str(new_issue)
                         print(
                             f"New issue created: {server.get('url')}/browse/{new_issue}"
                         )
