@@ -1,9 +1,13 @@
+import logging
+import os
+import runpy
+import sys
 from types import SimpleNamespace
 
 import pytest
 from jira import JIRAError
 
-from jipdate import cfg, jipdate
+from jipdate import cfg, jipdate, jiralogin
 from jipdate.adf import text_to_adf
 
 
@@ -537,3 +541,221 @@ def test_parse_status_file_skips_issue_jira_can_not_fetch(
 
     assert jira.calls == [("add_comment", "LAA-1", text_to_adf("first"))]
     assert f"[LAA-2] :  {error.text}" in capsys.readouterr().out
+
+
+def test_print_status(capsys):
+    jipdate.print_status(["[LAA-1]\n", "hello\n"])
+
+    assert capsys.readouterr().out == "This is your status:\n\n---\n\n[LAA-1]\nhello\n"
+
+
+def test_print_status_file(tmp_path, capsys):
+    path = tmp_path / "status.txt"
+    path.write_text("[LAA-1]\nhello\n")
+
+    jipdate.print_status_file(str(path))
+
+    assert capsys.readouterr().out == "[LAA-1]\nhello\n\n"
+
+
+@pytest.fixture
+def editor_env(monkeypatch):
+    called = []
+    monkeypatch.delenv("EDITOR", raising=False)
+    monkeypatch.delenv("VISUAL", raising=False)
+    monkeypatch.setattr(jipdate, "call", called.append)
+
+    def editor_env(existing_paths=()):
+        monkeypatch.setattr(jipdate.os.path, "exists", existing_paths.__contains__)
+        return called
+
+    return editor_env
+
+
+def test_open_editor_uses_visual(editor_env, monkeypatch):
+    called = editor_env()
+    monkeypatch.setenv("VISUAL", "emacs")
+
+    jipdate.open_editor("status.txt")
+
+    assert called == [["emacs", "status.txt"]]
+
+
+@pytest.mark.parametrize(
+    "existing, editor",
+    [
+        (["/usr/bin/editor", "/usr/bin/vim"], "/usr/bin/editor"),
+        (["/usr/bin/vim", "/usr/bin/vi"], "/usr/bin/vim"),
+        (["/usr/bin/vi"], "/usr/bin/vi"),
+    ],
+)
+def test_open_editor_fallbacks(editor_env, existing, editor):
+    called = editor_env(existing)
+
+    jipdate.open_editor("status.txt")
+
+    assert called == [[editor, "status.txt"]]
+
+
+def test_open_editor_without_editor_exits(editor_env):
+    called = editor_env()
+
+    with pytest.raises(SystemExit) as e:
+        jipdate.open_editor("status.txt")
+
+    assert e.value.code == os.EX_CONFIG
+    assert called == []
+
+
+def test_write_last_jira_comment_ignores_encode_error():
+    class AsciiFile:
+        def write(self, text):
+            raise UnicodeEncodeError("ascii", text, 0, 1, "not ascii")
+
+    jira = FakeJira(comments=[fake_comment("h\u00e4j")])
+
+    jipdate.write_last_jira_comment(AsciiFile(), jira, "LAA-1")
+
+
+def test_should_update_asks_again_on_bad_answer(set_config, monkeypatch, capsys):
+    replies = iter(["maybe", " Y "])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(replies))
+
+    assert jipdate.should_update() == "y"
+
+    out = capsys.readouterr().out
+    assert "Incorrect input: maybe" in out
+    assert out.count("Server to update: https://projects.linaro.org") == 2
+
+
+def test_parse_status_file_prints_status_without_s(
+    set_args, set_config, answer, status_file, capsys
+):
+    set_args()
+    jira = FakeJira()
+
+    jipdate.parse_status_file(
+        jira, status_file("[LAA-1]\nhello\n"), [FakeIssue("LAA-1")]
+    )
+
+    out = capsys.readouterr().out
+    assert "Successfully updated your Jira tickets!" in out
+    assert out.endswith("This is your status:\n\n---\n\n[LAA-1]\nhello\n")
+
+
+def test_parse_status_file_no_change_prints_status_without_s(
+    set_args, set_config, answer, status_file, capsys
+):
+    set_args()
+
+    with pytest.raises(SystemExit):
+        jipdate.parse_status_file(
+            FakeJira(), status_file("[LAA-1]\n"), [FakeIssue("LAA-1")]
+        )
+
+    assert capsys.readouterr().out.endswith("---\n\n[LAA-1]\n")
+
+
+@pytest.mark.parametrize(
+    "verbose, level", [(False, logging.ERROR), (True, logging.DEBUG)]
+)
+def test_initialize_logger(monkeypatch, verbose, level):
+    called = {}
+    monkeypatch.setattr(jipdate.log, "basicConfig", lambda **kw: called.update(kw))
+
+    jipdate.initialize_logger(SimpleNamespace(verbose=verbose))
+
+    assert called["level"] == level
+
+
+@pytest.fixture
+def run_main(monkeypatch, set_config, answer):
+    editor = []
+    logins = []
+    monkeypatch.setattr(cfg, "initiate_config", lambda: None)
+    monkeypatch.setattr(jipdate, "open_editor", editor.append)
+
+    def run_main(jira, *argv):
+        monkeypatch.setattr(sys, "argv", ["jipdate", *argv])
+
+        def login(use_test_server):
+            logins.append(use_test_server)
+            return jira, "first.last@linaro.org"
+
+        monkeypatch.setattr(jiralogin, "get_jira_instance", login)
+        jipdate.main()
+        return editor, logins
+
+    return run_main
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [[], ["-f", "status.txt", "-x"], ["-f", "status.txt", "-e"], ["-f", "s", "-p"]],
+)
+def test_main_bad_arguments_exit(run_main, argv):
+    with pytest.raises(SystemExit) as e:
+        run_main(FakeJira(), *argv)
+
+    assert e.value.code == os.EX_USAGE
+
+
+def test_main_query_and_print(run_main, tmp_path, capsys):
+    path = tmp_path / "status.txt"
+    jira = FakeJira(issues=[FakeIssue("LAA-1", summary="Fix it")])
+
+    with pytest.raises(SystemExit) as e:
+        run_main(jira, "-q", "-p", "-f", str(path))
+
+    assert e.value.code == os.EX_OK
+    out = capsys.readouterr().out
+    assert out.startswith("Subject: [Weekly] Week ending ")
+    assert "[LAA-1]\n# Header: Fix it\n" in out
+
+
+def test_main_query_edit_and_update(run_main, tmp_path, monkeypatch):
+    path = tmp_path / "status.txt"
+    issue = FakeIssue("LAA-1")
+    jira = FakeJira(issues=[issue])
+
+    def write_update(filename):
+        with open(filename, "a") as f:
+            f.write("done\n")
+
+    monkeypatch.setattr(jipdate, "open_editor", write_update)
+    run_main(jira, "-q", "-s", "-t", "-f", str(path))
+
+    assert ("add_comment", "LAA-1", text_to_adf("done")) in jira.calls
+
+
+def test_main_file_opens_editor_and_updates(run_main, status_file):
+    path = status_file("[LAA-2]\nhello\n")
+    jira = FakeJira(issues=[FakeIssue("LAA-2")])
+
+    editor, logins = run_main(jira, "-s", "-f", path)
+
+    assert editor == [path]
+    assert logins == [False]
+    assert jira.calls == [("add_comment", "LAA-2", text_to_adf("hello"))]
+
+
+def test_main_file_without_editor(run_main, set_config, status_file):
+    set_config({"text-editor": False})
+    path = status_file("[LAA-2]\nhello\n")
+    jira = FakeJira(issues=[FakeIssue("LAA-2")])
+
+    editor, _ = run_main(jira, "-s", "-f", path)
+
+    assert editor == []
+    assert jira.calls == [("add_comment", "LAA-2", text_to_adf("hello"))]
+
+
+def test_module_runs_main(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["jipdate", "--version"])
+    monkeypatch.delitem(sys.modules, "jipdate.jipdate")
+
+    with pytest.raises(SystemExit) as e:
+        runpy.run_module("jipdate.jipdate", run_name="__main__")
+
+    assert e.value.code == 0
+    assert capsys.readouterr().out.startswith("jipdate, ")
