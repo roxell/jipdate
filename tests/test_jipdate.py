@@ -686,6 +686,7 @@ def run_main(monkeypatch, set_config, answer):
         jipdate.main()
         return editor, logins
 
+    run_main.logins = logins
     return run_main
 
 
@@ -698,6 +699,7 @@ def test_main_bad_arguments_exit(run_main, argv):
         run_main(FakeJira(), *argv)
 
     assert e.value.code == os.EX_USAGE
+    assert run_main.logins == []
 
 
 def test_main_query_and_print(run_main, tmp_path, capsys):
