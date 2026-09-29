@@ -17,7 +17,7 @@ dependencies = [
 dynamic = ["version", "description"]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-cov"]
 
 [project.urls]
 Documentation = "https://jipdate.readthedocs.io/en/latest/"
@@ -30,3 +30,4 @@ jipstatus="jipdate.jipstatus:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=jipdate --cov-report=term-missing --cov-fail-under=90"
