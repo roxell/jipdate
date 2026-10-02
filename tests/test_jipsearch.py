@@ -44,6 +44,7 @@ class FakeJira:
         self.users = users or {}
         self.error = error
         self.calls = []
+        self.user_queries = []
 
     def search_issues(self, jql, **kwargs):
         self.calls.append(("search_issues", jql, kwargs))
@@ -52,6 +53,7 @@ class FakeJira:
         return self.issues
 
     def search_users(self, query):
+        self.user_queries.append(query)
         return [SimpleNamespace(accountId=i) for i in self.users.get(query, [])]
 
     def comments(self, key):
@@ -100,6 +102,14 @@ def test_create_jql_reporters_are_account_ids(set_args):
     jira = FakeJira(users={"anders": ["id-a"], "bob": ["id-b1", "id-b2"]})
 
     assert jipsearch.create_jql(jira, "") == "reporter in (id-a,id-b1,id-b2)"
+
+
+def test_create_jql_reporters_strips_names(set_args):
+    set_args("-r", " anders, bob,,")
+    jira = FakeJira(users={"anders": ["id-a"], "bob": ["id-b"]})
+
+    assert jipsearch.create_jql(jira, "") == "reporter in (id-a,id-b)"
+    assert jira.user_queries == ["anders", "bob"]
 
 
 def test_create_jql_assignees_are_account_ids(set_args):
