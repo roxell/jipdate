@@ -1,4 +1,5 @@
 import logging
+import os
 import runpy
 import sys
 from types import SimpleNamespace
@@ -395,3 +396,15 @@ def test_module_runs_main(monkeypatch, capsys):
 
     assert e.value.code == 0
     assert capsys.readouterr().out.startswith("jipsearch, ")
+
+
+@pytest.mark.parametrize("argv", [["-c"], ["-d", "-pk"], ["-r", "nobody"]])
+def test_main_without_search_exits(run_main, caplog, argv):
+    jira = FakeJira(issues=[raw_issue()])
+
+    with caplog.at_level(logging.ERROR), pytest.raises(SystemExit) as e:
+        run_main(jira, *argv)
+
+    assert e.value.code == os.EX_USAGE
+    assert jira.calls == []
+    assert "No search option given" in caplog.text
