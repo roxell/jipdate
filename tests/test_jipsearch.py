@@ -1,9 +1,12 @@
+import logging
+import runpy
+import sys
 from types import SimpleNamespace
 
 import pytest
 from jira import JIRAError
 
-from jipdate import cfg, jipsearch
+from jipdate import cfg, jipsearch, jiralogin
 from jipdate.adf import text_to_adf
 
 BROWSE = "https://linaro.atlassian.net/browse"
@@ -289,3 +292,106 @@ def test_print_issues_format_with_empty_field(set_args, capsys):
     jipsearch.print_issues(FakeJira(), [raw_issue()])
 
     assert capsys.readouterr().out == "LAA-1 None\n"
+
+
+def test_print_issues_format_nested_value(set_args, capsys):
+    set_args("-f", "{key} -> {parent:key} {status:statusCategory:name}")
+    issue = raw_issue(parent={"key": "LAA-5"})
+
+    jipsearch.print_issues(FakeJira(), [issue])
+
+    assert capsys.readouterr().out == "LAA-1 -> LAA-5 In Progress\n"
+
+
+def test_print_issues_format_key_inside_field(set_args, capsys):
+    set_args("-f", "{key} {issuetype:name}")
+
+    jipsearch.print_issues(FakeJira(), [raw_issue()])
+
+    assert capsys.readouterr().out == "LAA-1 Task\n"
+
+
+def test_print_issues_several_issues(set_args, capsys):
+    set_args("-f", "{key}")
+
+    jipsearch.print_issues(FakeJira(), [raw_issue("LAA-1"), raw_issue("LAA-2")])
+
+    assert capsys.readouterr().out == "LAA-1\nLAA-2\n"
+
+
+@pytest.mark.parametrize("argv, level", [([], logging.ERROR), (["-v"], logging.DEBUG)])
+def test_initialize_logger(monkeypatch, argv, level):
+    called = {}
+    monkeypatch.setattr(jipsearch.log, "basicConfig", lambda **kw: called.update(kw))
+
+    jipsearch.initialize_logger(jipsearch.get_parser().parse_args(argv))
+
+    assert called["level"] == level
+
+
+@pytest.fixture
+def run_main(monkeypatch, capsys):
+    logins = []
+    monkeypatch.setattr(cfg, "initiate_config", lambda: None)
+
+    def run_main(jira, *argv):
+        monkeypatch.setattr(sys, "argv", ["jipsearch", *argv])
+
+        def login(use_test_server):
+            logins.append(use_test_server)
+            return jira, "me"
+
+        monkeypatch.setattr(jiralogin, "get_jira_instance", login)
+        jipsearch.main()
+        return capsys.readouterr().out
+
+    run_main.logins = logins
+    return run_main
+
+
+def test_main_without_arguments_prints_help(run_main, capsys):
+    with pytest.raises(SystemExit) as e:
+        run_main(FakeJira())
+
+    assert e.value.code == 1
+    assert capsys.readouterr().err.startswith("usage: jipsearch")
+    assert run_main.logins == []
+
+
+def test_main_with_jql(run_main):
+    jira = FakeJira(issues=[raw_issue()])
+
+    out = run_main(jira, "-j", "status = Done", "-p", "LAA", "-f", "{key}")
+
+    assert out == "LAA-1\n"
+    assert [call[1] for call in jira.calls] == ["status = Done AND project in (LAA)"]
+    assert run_main.logins == [False]
+
+
+def test_main_with_several_jql(run_main):
+    jira = FakeJira(issues=[raw_issue()])
+
+    out = run_main(jira, "-j", "status = Done", "-j", "status = Open", "-f", "{key}")
+
+    assert out == "LAA-1\nLAA-1\n"
+    assert [call[1] for call in jira.calls] == ["status = Done", "status = Open"]
+
+
+def test_main_without_jql_uses_options(run_main):
+    jira = FakeJira(issues=[raw_issue(assignee=ANDERS)])
+
+    out = run_main(jira, "-k", "LAA-1")
+
+    assert [call[1] for call in jira.calls] == ["key in (LAA-1)"]
+    assert out.startswith(f"{BROWSE}/LAA-1 , Type: Task")
+
+
+def test_module_runs_main(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["jipsearch", "--version"])
+    monkeypatch.delitem(sys.modules, "jipdate.jipsearch")
+
+    with pytest.raises(SystemExit) as e:
+        runpy.run_module("jipdate.jipsearch", run_name="__main__")
+
+    assert e.value.code == 0
+    assert capsys.readouterr().out.startswith("jipsearch, ")
