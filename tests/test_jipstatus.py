@@ -1,5 +1,8 @@
 import datetime
+import logging
+import runpy
 import sys
+from html.parser import HTMLParser
 from types import SimpleNamespace
 
 import pytest
@@ -73,15 +76,21 @@ def set_args(monkeypatch):
 
 @pytest.fixture
 def run_main(monkeypatch, capsys):
+    logins = []
+
     def run_main(jira, *argv):
         monkeypatch.setattr(sys, "argv", ["jipstatus", *argv])
         monkeypatch.setattr(cfg, "initiate_config", lambda: None)
-        monkeypatch.setattr(
-            jiralogin, "get_jira_instance", lambda test: (jira, "me@linaro.org")
-        )
+
+        def login(use_test_server):
+            logins.append(use_test_server)
+            return jira, "me@linaro.org"
+
+        monkeypatch.setattr(jiralogin, "get_jira_instance", login)
         jipstatus.main()
         return capsys.readouterr().out
 
+    run_main.logins = logins
     return run_main
 
 
@@ -298,3 +307,139 @@ def test_days_must_be_a_number(capsys):
 
     assert e.value.code == 2
     assert "argument --days: invalid int value: '1w'" in capsys.readouterr().err
+
+
+class TagChecker(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.open_tags = []
+        self.errors = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "br":
+            self.open_tags.append(tag)
+
+    def handle_endtag(self, tag):
+        if not self.open_tags or self.open_tags.pop() != tag:
+            self.errors.append(f"unexpected </{tag}>")
+
+
+def html_errors(html):
+    checker = TagChecker()
+    checker.feed(html)
+    return checker.errors + [f"<{tag}> not closed" for tag in checker.open_tags]
+
+
+@pytest.mark.parametrize(
+    "updates, pendings",
+    [
+        ([FakeIssue("LAA-1", created_age=1)], []),
+        (
+            [
+                FakeIssue("LAA-1", comments=[fake_comment("a", 1)]),
+                FakeIssue(
+                    "LAA-2", comments=[fake_comment("b", 1), fake_comment("c", 1)]
+                ),
+            ],
+            [],
+        ),
+        ([], [FakeIssue("LAA-3"), FakeIssue("LAA-4", assignee=None)]),
+        (
+            [FakeIssue("LAA-1", comments=[fake_comment("a\nb", 1)])],
+            [FakeIssue("LAA-2"), FakeIssue("LAA-3", assignee="Bob")],
+        ),
+    ],
+)
+def test_main_html_tags_are_balanced(run_main, tmp_path, updates, pendings):
+    path = tmp_path / "status.html"
+
+    run_main(
+        FakeJira(updates=updates, pendings=pendings), "-p", "laa", "--html", str(path)
+    )
+
+    assert html_errors(path.read_text()) == []
+
+
+def test_main_html_lists_pending_and_components(run_main, tmp_path):
+    path = tmp_path / "status.html"
+    jira = FakeJira(
+        pendings=[FakeIssue("LAA-2", summary="Ongoing", components=["kernel"])]
+    )
+
+    run_main(jira, "-p", "laa", "--html", str(path))
+
+    html = path.read_text()
+    assert "<li>Ongoing</li>" in html
+    assert (
+        '<li>[<a href="https://linaro.atlassian.net/browse/LAA-2">LAA-2</a>]'
+        " [kernel] Ongoing</li>" in html
+    )
+
+
+def test_main_html_default_file_name(run_main, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    run_main(FakeJira(pendings=[FakeIssue("LAA-2")]), "-p", "laa", "--html")
+
+    assert "LAA-2" in (tmp_path / "status.html").read_text()
+
+
+def test_main_text_report_several_comments(run_main):
+    issue = FakeIssue(
+        "LAA-1",
+        created_age=1,
+        comments=[fake_comment("first", 2), fake_comment("second\nline", 1)],
+    )
+
+    out = run_main(FakeJira(updates=[issue]), "-p", "laa")
+
+    assert out == (
+        "\nAnders:\n"
+        " * Past\n"
+        "   * [LAA-1] Fix it - was created\n"
+        "     * first\n"
+        "     * second\n"
+        "       line\n"
+        "\n"
+    )
+
+
+def test_main_users_and_test_server(run_main):
+    jira = FakeJira()
+
+    run_main(jira, "--test", "-u", "anders", "-u", "bob")
+
+    assert run_main.logins == [True]
+    assert jira.calls[0][1].startswith(
+        "(assignee = 'anders@linaro.org' or assignee = 'bob@linaro.org')"
+    )
+
+
+def test_enumerate_updates_keeps_comment_order(set_args):
+    set_args("-p", "laa")
+    issue = FakeIssue(comments=[fake_comment("one", 3), fake_comment("two", 1)])
+
+    [update] = jipstatus.enumerate_updates(FakeJira(updates=[issue]))
+
+    assert update["comments"] == ["one", "two"]
+
+
+@pytest.mark.parametrize("argv, level", [([], logging.ERROR), (["-v"], logging.DEBUG)])
+def test_initialize_logger(monkeypatch, argv, level):
+    called = {}
+    monkeypatch.setattr(jipstatus.log, "basicConfig", lambda **kw: called.update(kw))
+
+    jipstatus.initialize_logger(jipstatus.get_parser().parse_args(argv))
+
+    assert called["level"] == level
+
+
+def test_module_runs_main(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["jipstatus", "--version"])
+    monkeypatch.delitem(sys.modules, "jipdate.jipstatus")
+
+    with pytest.raises(SystemExit) as e:
+        runpy.run_module("jipdate.jipstatus", run_name="__main__")
+
+    assert e.value.code == 0
+    assert capsys.readouterr().out.startswith("jipstatus, ")
