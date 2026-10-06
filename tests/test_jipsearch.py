@@ -112,6 +112,14 @@ def test_create_jql_reporters_strips_names(set_args):
     assert jira.user_queries == ["anders", "bob"]
 
 
+def test_create_jql_assignees_split_and_strip(set_args):
+    set_args("-a", " anders, bob,", "-a", "carl")
+    jira = FakeJira(users={"anders": ["id-a"], "bob": ["id-b"], "carl": ["id-c"]})
+
+    assert jipsearch.create_jql(jira, "") == "assignee in (id-a,id-b,id-c)"
+    assert jira.user_queries == ["anders", "bob", "carl"]
+
+
 def test_create_jql_assignees_are_account_ids(set_args):
     set_args("-a", "anders", "-a", "bob")
     jira = FakeJira(users={"anders": ["id-a"], "bob": ["id-b"]})
