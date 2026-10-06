@@ -287,3 +287,14 @@ def test_main_html_report(run_main, tmp_path):
     )
     assert "<li>line1<br>&lt;script&gt;x&lt;/script&gt;</li>" in html
     assert "<script>" not in html
+
+
+def test_days_must_be_a_number(capsys):
+    parser = jipstatus.get_parser()
+
+    assert parser.parse_args(["--days", "3"]).days == 3
+    with pytest.raises(SystemExit) as e:
+        parser.parse_args(["--days", "1w"])
+
+    assert e.value.code == 2
+    assert "argument --days: invalid int value: '1w'" in capsys.readouterr().err
