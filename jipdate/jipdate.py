@@ -642,13 +642,8 @@ def main():
         if cfg.args.p:
             print_status_file(filename)
             sys.exit(os.EX_OK)
-    elif cfg.args.file is not None:
-        filename = cfg.args.file
     else:
-        log.error(
-            "Trying to run script with unsupported configuration. Try using --help."
-        )
-        sys.exit(os.EX_USAGE)
+        filename = cfg.args.file
 
     if get_editor():
         open_editor(filename)
