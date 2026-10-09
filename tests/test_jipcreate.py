@@ -334,3 +334,31 @@ def test_main_required_field_missing_exits(run_main, capsys, field, name):
 
     assert e.value.code == os.EX_USAGE
     assert capsys.readouterr().out == f"Field {name} required but not set.\n"
+
+
+def test_main_epic_without_summary_reports_required_field(run_main, capsys):
+    jira = FakeJira(meta=create_meta(required=("summary",)))
+
+    with pytest.raises(SystemExit) as e:
+        run_main(jira, "- Project: LAA\n  IssueType: Epic\n")
+
+    assert e.value.code == os.EX_USAGE
+    assert capsys.readouterr().out == "Field Summary required but not set.\n"
+
+
+def test_main_dry_run_without_summary(run_main):
+    out = run_main(FakeJira(), "- Project: LAA\n  IssueType: Task\n", "--dry-run")
+
+    assert out == (
+        "This issue would have been created when running without '--dry-run':\n"
+        "project: {'key': 'LAA'}\n"
+        "issuetype: {'name': 'Task'}\n"
+    )
+
+
+def test_main_create_without_summary(run_main):
+    jira = FakeJira()
+
+    out = run_main(jira, "- Project: LAA\n  IssueType: Task\n")
+
+    assert out == f"New issue created: {SERVER}/browse/LAA-101\n"
