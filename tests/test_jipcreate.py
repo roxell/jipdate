@@ -1,5 +1,6 @@
 import logging
 import os
+import runpy
 import sys
 from types import SimpleNamespace
 
@@ -362,3 +363,103 @@ def test_main_create_without_summary(run_main):
     out = run_main(jira, "- Project: LAA\n  IssueType: Task\n")
 
     assert out == f"New issue created: {SERVER}/browse/LAA-101\n"
+
+
+def test_main_unknown_project(run_main):
+    jira = FakeJira(meta={"projects": []})
+
+    out = run_main(jira, TASK)
+
+    assert jira.created == 0
+    assert out == "Please specify 'Project' and 'IssueType'.\n"
+
+
+def test_main_continues_after_bad_issue(run_main):
+    jira = FakeJira()
+
+    out = run_main(jira, "- Summary: no project\n" + TASK)
+
+    assert jira.created == 1
+    assert out == (
+        "Please specify 'Project' and 'IssueType'.\n"
+        f"New issue created: {SERVER}/browse/LAA-101\n"
+    )
+
+
+def test_main_sprint_on_second_scrum_board(run_main):
+    jira = FakeJira(
+        boards=[
+            SimpleNamespace(id=1, type="scrum"),
+            SimpleNamespace(id=2, type="scrum"),
+        ],
+        sprint_pages={
+            1: [FakeResultList([sprint("Sprint 1", 501)], is_last=True)],
+            2: [FakeResultList([sprint("Sprint 7", 707)], is_last=True)],
+        },
+    )
+
+    run_main(jira, TASK + "  Sprint: Sprint 7\n")
+
+    assert created_fields(jira)["customfield_10020"] == 707
+
+
+def test_main_sprint_with_only_kanban_boards(run_main):
+    jira = FakeJira(boards=[SimpleNamespace(id=1, type="kanban")])
+
+    out = run_main(jira, TASK + "  Sprint: Sprint 1\n")
+
+    assert jira.created == 0
+    assert ("sprints", 1, 0) not in jira.calls
+    assert out == 'Sprint "Sprint 1" not found in project LAA\n'
+
+
+def test_main_values_that_match_nothing_are_not_set(run_main):
+    jira = FakeJira()
+    yml = TASK + (
+        "  ClientStakeholder: Nobody\n"
+        "  Components: unknown, other\n"
+        "  Share Visibility: []\n"
+    )
+
+    run_main(jira, yml)
+
+    assert created_fields(jira) == {
+        "project": {"key": "LAA"},
+        "issuetype": {"name": "Task"},
+        "summary": "Fix it",
+    }
+
+
+def test_main_dry_run_epic_link_to_epic_in_same_file(run_main):
+    jira = FakeJira()
+    yml = (
+        "- Project: LAA\n  IssueType: Epic\n  Summary: Big thing\n"
+        "- Project: LAA\n  IssueType: Task\n  Summary: Part\n"
+        "  EpicLink: Big thing\n"
+    )
+
+    out = run_main(jira, yml, "--dry-run")
+
+    assert jira.created == 0
+    assert "customfield_10014: new_issue, Big thing\n" in out
+
+
+@pytest.mark.parametrize("argv, level", [([], logging.ERROR), (["-v"], logging.DEBUG)])
+def test_initialize_logger(monkeypatch, argv, level):
+    called = {}
+    monkeypatch.setattr(jipcreate.log, "basicConfig", lambda **kw: called.update(kw))
+
+    jipcreate.initialize_logger(jipcreate.get_parser().parse_args(argv))
+
+    assert called["level"] == level
+
+
+def test_module_runs_main(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["jipcreate", "--version"])
+    monkeypatch.delitem(sys.modules, "jipdate.jipcreate")
+
+    with pytest.raises(SystemExit) as e:
+        runpy.run_module("jipdate.jipcreate", run_name="__main__")
+
+    assert e.value.code == 0
+    assert capsys.readouterr().out.startswith("jipcreate, ")
