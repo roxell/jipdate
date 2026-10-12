@@ -203,17 +203,28 @@ def test_enumerate_pending(set_args):
     set_args("-p", "laa")
     jira = FakeJira(
         pendings=[
-            FakeIssue("LAA-1", created_age=2),
-            FakeIssue("LAA-2", created_age=30, assignee=None),
+            FakeIssue("LAA-1", components=["kernel"]),
+            FakeIssue("LAA-2", assignee=None),
         ]
     )
 
     pendings = list(jipstatus.enumerate_pending(jira))
 
-    assert [(p["issue"], p["assignee"], p["new"]) for p in pendings] == [
-        ("LAA-1", "Anders", True),
-        ("LAA-2", "Unassigned", False),
+    assert pendings == [
+        {
+            "issue": "LAA-1",
+            "assignee": "Anders",
+            "summary": "Fix it",
+            "components": ["kernel"],
+        },
+        {
+            "issue": "LAA-2",
+            "assignee": "Unassigned",
+            "summary": "Fix it",
+            "components": [],
+        },
     ]
+    assert jira.calls[0][2]["fields"] == "summary,assignee,components"
     jql = jira.calls[0][1]
     assert jql.startswith("project =  'LAA' AND status = 'In Progress'")
     assert "AND issuetype != Initiative" in jql

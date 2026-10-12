@@ -111,8 +111,6 @@ def enumerate_updates(jira):
 
 
 def enumerate_pending(jira):
-    since = datetime.datetime.now() - datetime.timedelta(days=7)
-
     jql = default_jql()
     jql += "AND status = 'In Progress' \
             AND issuetype != Initiative \
@@ -122,7 +120,7 @@ def enumerate_pending(jira):
     my_issues = jira.search_issues(
         jql,
         expand="changelog",
-        fields="summary,assignee,created,components",
+        fields="summary,assignee,components",
         maxResults=False,
     )
 
@@ -135,11 +133,6 @@ def enumerate_pending(jira):
             status["assignee"] = "Unassigned"
         status["summary"] = issue.fields.summary
         status["components"] = issue.fields.components
-
-        created = datetime.datetime.strptime(
-            issue.fields.created, "%Y-%m-%dT%H:%M:%S.%f%z"
-        )
-        status["new"] = created.replace(tzinfo=None) > since
 
         yield (status)
 
