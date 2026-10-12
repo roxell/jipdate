@@ -157,189 +157,177 @@ def main():
 
     jira, username = jiralogin.get_jira_instance(False)
 
-    if cfg.args.file is not None:
-        filename = cfg.args.file
-        issues = parse_issue_file(filename)
-        for issue in issues:
-            # We should only find one project and one issue type otherwise something is wrong
-            issue_fields_dict = {}
-            try:
-                issue_meta_data = jira.createmeta(
-                    projectKeys=issue["Project"],
-                    issuetypeNames=issue["IssueType"],
-                    expand="projects.issuetypes.fields",
+    filename = cfg.args.file
+    issues = parse_issue_file(filename)
+    for issue in issues:
+        # We should only find one project and one issue type otherwise something is wrong
+        issue_fields_dict = {}
+        try:
+            issue_meta_data = jira.createmeta(
+                projectKeys=issue["Project"],
+                issuetypeNames=issue["IssueType"],
+                expand="projects.issuetypes.fields",
+            )
+            issue_fields_dict = issue_meta_data["projects"][0]["issuetypes"][0][
+                "fields"
+            ]
+            log.debug(f"Project: {issue['Project']}")
+            log.debug(f"IssueType: {issue['IssueType']}")
+            log.debug(f"issue fields dict: {issue_fields_dict}")
+        except (IndexError, KeyError):
+            print(f"Please specify 'Project' and 'IssueType'.")
+
+        if issue_fields_dict:
+            fields = {
+                "project": {"key": issue["Project"]},
+                "issuetype": {"name": issue["IssueType"]},
+            }
+
+            if "Summary" in issue.keys():
+                fields["summary"] = issue["Summary"]
+
+            if "Description" in issue.keys():
+                fields["description"] = text_to_adf(issue["Description"])
+
+            if "OriginalEstimate" in issue.keys():
+                fields["timetracking"] = {"originalEstimate": issue["OriginalEstimate"]}
+
+            if "AssigneeEmail" in issue.keys():
+                assignee = jira.search_assignable_users_for_issues(
+                    query=issue["AssigneeEmail"], project=issue["Project"]
                 )
-                issue_fields_dict = issue_meta_data["projects"][0]["issuetypes"][0][
+                log.debug(f"Assignee email: {issue['AssigneeEmail']}")
+                log.debug(f"Assignee: {assignee}")
+                # We assume that the first entry in the returned user array is the one we want
+                if len(assignee) > 0:
+                    fields["assignee"] = {"id": assignee[0].accountId}
+
+            if "EpicLink" in issue.keys():
+                if issue["EpicLink"] in created_cards.keys():
+                    fields["customfield_10014"] = created_cards[issue["EpicLink"]]
+                else:
+                    fields["customfield_10014"] = issue["EpicLink"]
+
+            if "ClientStakeholder" in issue.keys():
+                csh_fields_dict = issue_meta_data["projects"][0]["issuetypes"][0][
                     "fields"
-                ]
-                log.debug(f"Project: {issue['Project']}")
-                log.debug(f"IssueType: {issue['IssueType']}")
-                log.debug(f"issue fields dict: {issue_fields_dict}")
-            except (IndexError, KeyError):
-                print(f"Please specify 'Project' and 'IssueType'.")
+                ]["customfield_10104"]["allowedValues"]
+                for s in csh_fields_dict:
+                    if s["value"] == issue["ClientStakeholder"]:
+                        fields["customfield_10104"] = [
+                            {
+                                "self": s["self"],
+                                "value": s["value"],
+                                "id": str(s["id"]),
+                            }
+                        ]
 
-            if issue_fields_dict:
-                fields = {
-                    "project": {"key": issue["Project"]},
-                    "issuetype": {"name": issue["IssueType"]},
-                }
+            if "Components" in issue.keys():
+                components = jira.project_components(issue["Project"])
+                comparr = []
+                for c in components:
+                    for comp in issue["Components"].split(","):
+                        if c.name == comp.strip():
+                            comparr.append({"id": str(c.id)})
+                if len(comparr) > 0:
+                    fields["components"] = comparr
 
-                if "Summary" in issue.keys():
-                    fields["summary"] = issue["Summary"]
+            sprint_found = True  # Only indicate sprint not found in case a sprint has been specified.
+            if "Sprint" in issue.keys():
+                sprint_found = False
+                boards_in_project = jira.boards(projectKeyOrID=issue["Project"])
+                log.debug(f"Boards:")
+                for board in boards_in_project:
+                    log.debug(f"* {board}")
+                    if board.type == "kanban":
+                        continue
 
-                if "Description" in issue.keys():
-                    fields["description"] = text_to_adf(issue["Description"])
+                    sprints_in_board = get_sprints(jira, board.id)
 
-                if "OriginalEstimate" in issue.keys():
-                    fields["timetracking"] = {
-                        "originalEstimate": issue["OriginalEstimate"]
-                    }
+                    log.debug(f" + Sprints:")
+                    for sprint in sprints_in_board:
+                        log.debug(f"  - {sprint}")
+                        if sprint.name == issue["Sprint"]:
+                            fields["customfield_10020"] = sprint.id
+                            sprint_found = True
 
-                if "AssigneeEmail" in issue.keys():
-                    assignee = jira.search_assignable_users_for_issues(
-                        query=issue["AssigneeEmail"], project=issue["Project"]
+            if "Due date" in issue.keys():
+                fields["duedate"] = str(issue["Due date"])
+
+            if "IssueType" in issue.keys() and issue["IssueType"] == "Epic":
+                if "Epic Name" in issue.keys():
+                    fields["customfield_10011"] = issue["Epic Name"]
+                elif "Summary" in issue.keys():
+                    fields["customfield_10011"] = issue["Summary"]
+
+            if "Share Visibility" in issue.keys():
+                share_visibility = []
+                for shared_with in issue["Share Visibility"]:
+                    users = jira.search_assignable_users_for_issues(
+                        query=shared_with, project=issue["Project"]
                     )
-                    log.debug(f"Assignee email: {issue['AssigneeEmail']}")
-                    log.debug(f"Assignee: {assignee}")
-                    # We assume that the first entry in the returned user array is the one we want
-                    if len(assignee) > 0:
-                        fields["assignee"] = {"id": assignee[0].accountId}
+                    if not users:
+                        print(f"Share Visibility: user {shared_with} not found")
+                        continue
+                    share_visibility.append({"id": users[0].accountId})
+                log.debug(f"shared with: {issue['Share Visibility']}")
+                log.debug(f"share_visibility: {share_visibility}")
+                # We assume that the first entry in the returned user array is the one we want
+                if len(share_visibility) > 0:
+                    fields["customfield_10034"] = share_visibility
 
-                if "EpicLink" in issue.keys():
-                    if issue["EpicLink"] in created_cards.keys():
-                        fields["customfield_10014"] = created_cards[issue["EpicLink"]]
-                    else:
-                        fields["customfield_10014"] = issue["EpicLink"]
+            if not sprint_found:
+                print(
+                    'Sprint "'
+                    + issue["Sprint"]
+                    + '" not found in project '
+                    + issue["Project"]
+                )
+                continue
 
-                if "ClientStakeholder" in issue.keys():
-                    csh_fields_dict = issue_meta_data["projects"][0]["issuetypes"][0][
-                        "fields"
-                    ]["customfield_10104"]["allowedValues"]
-                    for s in csh_fields_dict:
-                        if s["value"] == issue["ClientStakeholder"]:
-                            fields["customfield_10104"] = [
-                                {
-                                    "self": s["self"],
-                                    "value": s["value"],
-                                    "id": str(s["id"]),
-                                }
-                            ]
-
-                if "Components" in issue.keys():
-                    components = jira.project_components(issue["Project"])
-                    comparr = []
-                    for c in components:
-                        for comp in issue["Components"].split(","):
-                            if c.name == comp.strip():
-                                comparr.append({"id": str(c.id)})
-                    if len(comparr) > 0:
-                        fields["components"] = comparr
-
-                sprint_found = True  # Only indicate sprint not found in case a sprint has been specified.
-                if "Sprint" in issue.keys():
-                    sprint_found = False
-                    boards_in_project = jira.boards(projectKeyOrID=issue["Project"])
-                    log.debug(f"Boards:")
-                    for board in boards_in_project:
-                        log.debug(f"* {board}")
-                        if board.type == "kanban":
-                            continue
-
-                        sprints_in_board = get_sprints(jira, board.id)
-
-                        log.debug(f" + Sprints:")
-                        for sprint in sprints_in_board:
-                            log.debug(f"  - {sprint}")
-                            if sprint.name == issue["Sprint"]:
-                                fields["customfield_10020"] = sprint.id
-                                sprint_found = True
-
-                if "Due date" in issue.keys():
-                    fields["duedate"] = str(issue["Due date"])
-
-                if "IssueType" in issue.keys() and issue["IssueType"] == "Epic":
-                    if "Epic Name" in issue.keys():
-                        fields["customfield_10011"] = issue["Epic Name"]
-                    elif "Summary" in issue.keys():
-                        fields["customfield_10011"] = issue["Summary"]
-
-                if "Share Visibility" in issue.keys():
-                    share_visibility = []
-                    for shared_with in issue["Share Visibility"]:
-                        users = jira.search_assignable_users_for_issues(
-                            query=shared_with, project=issue["Project"]
-                        )
-                        if not users:
-                            print(f"Share Visibility: user {shared_with} not found")
-                            continue
-                        share_visibility.append({"id": users[0].accountId})
-                    log.debug(f"shared with: {issue['Share Visibility']}")
-                    log.debug(f"share_visibility: {share_visibility}")
-                    # We assume that the first entry in the returned user array is the one we want
-                    if len(share_visibility) > 0:
-                        fields["customfield_10034"] = share_visibility
-
-                if not sprint_found:
+            # Check if all feilds are possible to set in this issuetype and project.
+            for field in fields.keys():
+                if field not in issue_fields_dict.keys():
                     print(
-                        'Sprint "'
-                        + issue["Sprint"]
-                        + '" not found in project '
-                        + issue["Project"]
+                        f"Field {field} set by script but not possible for issuetype and project in Jira."
                     )
-                    continue
+                    sys.exit(os.EX_USAGE)
 
-                # Check if all feilds are possible to set in this issuetype and project.
-                for field in fields.keys():
-                    if field not in issue_fields_dict.keys():
+            # Check fields required by Jira.
+            for field in issue_fields_dict.keys():
+                if (
+                    issue_fields_dict[field]["required"]
+                    and not issue_fields_dict[field]["hasDefaultValue"]
+                ):
+                    if field not in fields.keys():
                         print(
-                            f"Field {field} set by script but not possible for issuetype and project in Jira."
+                            f"Field {jira_field_to_yaml.get(field, field)} required but not set."
                         )
                         sys.exit(os.EX_USAGE)
 
-                # Check fields required by Jira.
-                for field in issue_fields_dict.keys():
-                    if (
-                        issue_fields_dict[field]["required"]
-                        and not issue_fields_dict[field]["hasDefaultValue"]
-                    ):
-                        if field not in fields.keys():
-                            print(
-                                f"Field {jira_field_to_yaml.get(field, field)} required but not set."
-                            )
-                            sys.exit(os.EX_USAGE)
-
-                if cfg.args.dry_run:
+            if cfg.args.dry_run:
+                print(
+                    f"This issue would have been created when running without '--dry-run':"
+                )
+                if "Summary" in issue.keys():
+                    created_cards[issue["Summary"]] = f"new_issue, {issue['Summary']}"
+                for field in fields.keys():
+                    print(f"{field}: {fields[field]}")
+            else:
+                server = cfg.get_server()
+                if "Key" in issue.keys():
+                    # Update existing card.
+                    existing = jira.issue(issue["Key"])
+                    existing.update(fields=fields)
                     print(
-                        f"This issue would have been created when running without '--dry-run':"
+                        f"Existing issue updated: {server.get('url')}/browse/{existing}"
                     )
-                    if "Summary" in issue.keys():
-                        created_cards[issue["Summary"]] = (
-                            f"new_issue, {issue['Summary']}"
-                        )
-                    for field in fields.keys():
-                        print(f"{field}: {fields[field]}")
                 else:
-                    server = cfg.get_server()
-                    if "Key" in issue.keys():
-                        # Update existing card.
-                        existing = jira.issue(issue["Key"])
-                        existing.update(fields=fields)
-                        print(
-                            f"Existing issue updated: {server.get('url')}/browse/{existing}"
-                        )
-                    else:
-                        # Create new card.
-                        new_issue = jira.create_issue(fields=fields)
-                        if "Summary" in issue.keys():
-                            created_cards[issue["Summary"]] = str(new_issue)
-                        print(
-                            f"New issue created: {server.get('url')}/browse/{new_issue}"
-                        )
-    else:
-        log.error(
-            "Trying to run script with unsupported configuration. Try using --help."
-        )
-        sys.exit(os.EX_USAGE)
+                    # Create new card.
+                    new_issue = jira.create_issue(fields=fields)
+                    if "Summary" in issue.keys():
+                        created_cards[issue["Summary"]] = str(new_issue)
+                    print(f"New issue created: {server.get('url')}/browse/{new_issue}")
 
 
 if __name__ == "__main__":
