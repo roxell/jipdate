@@ -224,7 +224,10 @@ def test_enumerate_pending(set_args):
             "components": [],
         },
     ]
-    assert jira.calls[0][2]["fields"] == "summary,assignee,components"
+    assert jira.calls[0][2] == {
+        "fields": "summary,assignee,components",
+        "maxResults": False,
+    }
     jql = jira.calls[0][1]
     assert jql.startswith("project =  'LAA' AND status = 'In Progress'")
     assert "AND issuetype != Initiative" in jql

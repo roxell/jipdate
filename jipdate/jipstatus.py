@@ -119,7 +119,6 @@ def enumerate_pending(jira):
 
     my_issues = jira.search_issues(
         jql,
-        expand="changelog",
         fields="summary,assignee,components",
         maxResults=False,
     )
