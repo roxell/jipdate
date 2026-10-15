@@ -75,6 +75,8 @@ def set_args(monkeypatch):
         (["-k", "LAA-1", "-k", "LAA-2"], "key in (LAA-1, LAA-2)"),
         (["-p", "LAA,TCWG"], "project in (LAA,TCWG)"),
         (["-s", "Sprint 1"], "sprint in ('Sprint 1')"),
+        (["-st", "To Do, In Progress"], 'status in ("To Do", "In Progress")'),
+        (["--status", "!Done,Closed"], 'status not in ("Done", "Closed")'),
         (["-e", "LAA-5"], "(key = LAA-5 or parentepic = LAA-5)"),
         (["-ca", "2026-01-01"], "created >= 2026-01-01"),
         (["--created-before=-5d"], "created <= -5d"),

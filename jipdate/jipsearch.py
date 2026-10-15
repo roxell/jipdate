@@ -186,6 +186,17 @@ def get_parser():
     )
 
     parser.add_argument(
+        "-st",
+        "--status",
+        required=False,
+        action="store",
+        default=None,
+        help="""Search for issues with the specified statuses.
+            Use comma to separate multiple statuses. Start with "!" to
+            exclude them, e.g. --status '!Done,Closed'.""",
+    )
+
+    parser.add_argument(
         "-v",
         "--verbose",
         required=False,
@@ -243,6 +254,15 @@ def create_jql(jira, initial_jql):
 
     if cfg.args.sprint:
         jql_parts.append("sprint in ('%s')" % cfg.args.sprint)
+
+    if cfg.args.status:
+        status = cfg.args.status
+        operator = "in"
+        if status.startswith("!"):
+            operator = "not in"
+            status = status[1:]
+        names = ", ".join(f'"{name}"' for name in split_names(status))
+        jql_parts.append(f"status {operator} ({names})")
 
     if cfg.args.reporter:
         reporter_ids = []
