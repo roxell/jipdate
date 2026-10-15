@@ -77,17 +77,11 @@ def get_username():
 
     username = get_username_from_input()
 
-    if username is not None:
-        question = (
-            "Username not found in %s, want to store it? (y/n) " % cfg.config_file
-        )
-        answer = input(question).lower().strip()
-        if answer in set(["y"]):
-            store_username_in_config(username)
-        return username
-    else:
-        log.error("No JIRA_USERNAME exported and no username found in config.yml")
-        sys.exit(os.EX_NOUSER)
+    question = "Username not found in %s, want to store it? (y/n) " % cfg.config_file
+    answer = input(question).lower().strip()
+    if answer in set(["y"]):
+        store_username_in_config(username)
+    return username
 
 
 def get_password():
