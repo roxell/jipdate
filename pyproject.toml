@@ -30,4 +30,4 @@ jipstatus="jipdate.jipstatus:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=jipdate --cov-report=term-missing --cov-fail-under=90"
+addopts = "--cov=jipdate --cov-report=term-missing --cov-fail-under=100"
